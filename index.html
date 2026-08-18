@@ -136,6 +136,23 @@ header{margin-bottom:20px}
 .bar-fill{position:absolute;left:0;top:0;bottom:0}
 .bar-val{font-family:var(--mono);font-size:11px;color:var(--muted);width:36px;flex:none}
 .empty{background:#fff;border:1px solid var(--line);padding:40px 20px;text-align:center;color:var(--muted);font-family:var(--serif)}
+.btn.big{padding:11px 17px;font-size:15px}
+.btn.full{width:100%;justify-content:center;margin-top:16px}
+.answer{font-size:16px}
+.drillans{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--teal-d);margin-bottom:10px}
+@media(max-width:640px){
+  .wrap{padding:16px 12px 48px}
+  .cluetext{font-size:23px;line-height:1.3}
+  .btn{padding:10px 14px}
+  .btn.big{padding:14px 18px;font-size:16px}
+  .answer{padding:13px 14px}
+  .cell{width:31px;height:31px;font-size:15px}
+  .tab{padding:11px 13px;font-size:15px}
+  .chip{padding:8px 12px}
+  .card-head{padding:18px 16px 14px}
+  .card-body{padding:16px}
+  .drillterm{font-size:26px}
+}
 </style>
 </head>
 <body>
@@ -383,7 +400,7 @@ function pick(){
 function fresh(){
   E.current=pick();E.revealed=false;E.peeked=false;E.check=null;E.defHint=false;E.inputVal="";
   if(E.current)E.recent=E.recent.concat(E.current.id).slice(-12);
-  renderCard();
+  populateCard();
 }
 
 /* ============ records ============ */
@@ -436,73 +453,92 @@ function renderPractice(){
       '<button class="btn btn-ghost" id="toggleimport">'+(P.showImport?"Close":"Add clues")+'</button></div>';
     if(P.showImport)h+=importPanelHTML();
   }
-  h+='<div id="card"></div><div class="foot" id="foot"></div>';
+  h+=cardSkeleton()+'<div class="foot" id="foot"></div>';
   $("#view").innerHTML=h;
   $("#deck-learn").onclick=()=>{P.deck="learn";P.filter="all";E.recent=[];renderPractice();};
   $("#deck-assorted").onclick=()=>{P.deck="assorted";E.recent=[];renderPractice();};
   if(P.deck==="learn"){document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{const f=b.getAttribute("data-f");P.filter=(f!=="all"&&f!=="weak"&&P.filter===f)?"all":f;E.recent=[];renderPractice();});}
   else{$("#toggleimport").onclick=()=>{P.showImport=!P.showImport;renderPractice();};if(P.showImport)wireImport();}
+  wireCard();
   fresh();
 }
-function clueHTML(hl){
-  const c=E.current,def=c.def||"";
-  const loc=def&&c.clue.toLowerCase().includes(def.toLowerCase());
-  if(!hl||!loc)return esc(c.clue);
-  const i=c.clue.toLowerCase().indexOf(def.toLowerCase());
-  return esc(c.clue.slice(0,i))+'<span class="hl">'+esc(c.clue.slice(i,i+def.length))+'</span>'+esc(c.clue.slice(i+def.length));
+function cardSkeleton(){
+  return '<div class="card" id="card"><div class="card-head">'+
+    '<div class="chiprow" id="devchipwrap"></div>'+
+    '<p class="cluetext" id="cluetext"></p></div>'+
+    '<div class="card-body">'+
+      '<div id="preveal">'+
+        '<div class="row2"><input id="panswer" class="answer" placeholder="type answer" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" inputmode="text"/>'+
+        '<button class="btn btn-teal big" id="checkbtn">Check</button></div>'+
+        '<div id="pmsg" class="msg-inline"></div>'+
+        '<div class="row center gap" id="hintrow" style="margin-top:12px">'+
+          '<button class="btn btn-ghost" id="hintbtn">highlight definition</button>'+
+          '<button class="btn btn-dark" id="revealbtn">Reveal answer</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="revealed" hidden>'+
+        '<div class="cells accent" id="answercells" style="margin-bottom:16px"></div>'+
+        '<div class="lbl">Definition</div><div class="defn" id="defntext"></div>'+
+        '<div id="detail"></div>'+
+        '<span class="badge" id="gradebadge"></span>'+
+        '<button class="btn btn-dark big full" id="nextbtn">Next clue \u203a</button>'+
+      '</div>'+
+    '</div></div>';
 }
-function renderCard(){
-  const c=E.current;const card=$("#card");if(!c){if(card)card.innerHTML="";return;}
-  const dev=P.deck==="learn"?DEVICES[c.device]:null;
-  const loc=!!(c.def&&c.clue.toLowerCase().includes((c.def||"").toLowerCase()));
-  const showHl=(E.defHint||E.revealed)&&loc;
-  let head;
-  if(P.deck==="learn"){
-    head=(E.revealed||E.peeked)
-      ?'<span class="devchip">'+esc(dev.name)+'</span><span class="devblurb">'+esc(dev.blurb)+'</span>'
-      :'<button class="devchip dash" id="peekbtn">peek device</button>';
-  }else head='<span class="devchip">real clue</span>';
-  let body;
-  if(!E.revealed){
-    body='<div class="row2"><input id="panswer" class="answer" placeholder="type your answer" autocomplete="off" spellcheck="false"/>'+
-      '<button class="btn btn-teal" id="checkbtn">Check</button></div>'+
-      '<div id="pmsg" class="msg-inline"></div>'+
-      '<div class="row center gap" style="margin-top:12px">'+
-      (loc?'<button class="btn btn-ghost" id="hintbtn">highlight definition</button>':"")+
-      '<button class="btn btn-dark" id="revealbtn">Reveal answer</button></div>';
-  }else{
-    const g=E.check==="correct"?((E.peeked||E.defHint)?"partial":"clean"):"missed";
-    const gt=g==="clean"?"Cracked it":g==="partial"?("Needed a nudge \u00b7 "+(E.peeked&&!E.defHint?"device peeked":E.defHint&&!E.peeked?"definition shown":"hint used")):"Missed it \u00b7 revealed";
-    const detail=P.deck==="learn"
-      ?'<div class="lbl">Wordplay</div><div class="parse">'+esc(c.parse).replace(/\n/g,"<br>")+'</div>'
-      :'<div class="lbl">Source</div><div class="src">'+esc(c.source||"imported")+'</div>';
-    body='<div class="cells accent" style="margin-bottom:16px">'+cellsHTML(c.answer)+'</div>'+
-      '<div class="lbl">Definition</div><div class="defn">'+esc(c.def||"\u2014")+'</div>'+detail+
-      '<div class="row between"><span class="badge '+g+'">'+gt+'</span>'+
-      '<button class="btn btn-dark" id="nextbtn">Next clue \u203a</button></div>';
+function wireCard(){
+  const inp=$("#panswer");
+  if(inp){
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter")doCheck();});
+    inp.addEventListener("input",()=>{E.inputVal=inp.value;const m=$("#pmsg");if(m){m.textContent="";m.className="msg-inline";}inp.classList.remove("bad");});
   }
-  card.innerHTML='<div class="card"><div class="card-head"><div class="chiprow" id="devchipwrap">'+head+'</div>'+
-    '<p class="cluetext" id="cluetext">'+clueHTML(showHl)+'</p></div><div class="card-body">'+body+'</div></div>';
-  if(!E.revealed){
-    const inp=$("#panswer");
-    if(inp){inp.value=E.inputVal||"";inp.focus();
-      inp.addEventListener("keydown",e=>{if(e.key==="Enter")doCheck();});
-      inp.addEventListener("input",()=>{E.inputVal=inp.value;const m=$("#pmsg");if(m){m.textContent="";m.className="msg-inline";}inp.classList.remove("bad");});}
-    $("#checkbtn").onclick=doCheck;
-    if($("#revealbtn"))$("#revealbtn").onclick=doReveal;
-    if($("#hintbtn"))$("#hintbtn").onclick=doHint;
-    if($("#peekbtn"))$("#peekbtn").onclick=doPeek;
-  }else $("#nextbtn").onclick=nextCard;
+  $("#checkbtn").onclick=doCheck;
+  $("#revealbtn").onclick=doReveal;
+  $("#hintbtn").onclick=doHint;
+  $("#nextbtn").onclick=nextCard;
+}
+function clueMarkup(clue,def,hl){
+  const loc=def&&clue.toLowerCase().includes(def.toLowerCase());
+  if(!hl||!loc)return esc(clue);
+  const i=clue.toLowerCase().indexOf(def.toLowerCase());
+  return esc(clue.slice(0,i))+'<span class="hl">'+esc(clue.slice(i,i+def.length))+'</span>'+esc(clue.slice(i+def.length));
+}
+function populateCard(){
+  const c=E.current;if(!c)return;
+  const wrap=$("#devchipwrap");
+  if(P.deck==="learn"){wrap.innerHTML='<button class="devchip dash" id="peekbtn">peek device</button>';$("#peekbtn").onclick=doPeek;}
+  else wrap.innerHTML='<span class="devchip">real clue</span>';
+  $("#cluetext").innerHTML=clueMarkup(c.clue,c.def||"",false);
+  const inp=$("#panswer");if(inp){inp.value="";inp.classList.remove("bad");}
+  E.inputVal="";
+  const m=$("#pmsg");if(m){m.textContent="";m.className="msg-inline";}
+  const loc=!!(c.def&&c.clue.toLowerCase().includes((c.def||"").toLowerCase()));
+  $("#hintbtn").style.display=loc?"":"none";
+  $("#preveal").hidden=false;$("#revealed").hidden=true;
   updateFoot();
+  if(inp)inp.focus();
+}
+function showRevealed(){
+  const c=E.current;
+  if(P.deck==="learn"){const d=DEVICES[c.device];$("#devchipwrap").innerHTML='<span class="devchip">'+esc(d.name)+'</span><span class="devblurb">'+esc(d.blurb)+'</span>';}
+  $("#cluetext").innerHTML=clueMarkup(c.clue,c.def||"",true);
+  $("#answercells").innerHTML=cellsHTML(c.answer);
+  $("#defntext").textContent=c.def||"\u2014";
+  $("#detail").innerHTML=P.deck==="learn"
+    ?'<div class="lbl">Wordplay</div><div class="parse">'+esc(c.parse).replace(/\n/g,"<br>")+'</div>'
+    :'<div class="lbl">Source</div><div class="src">'+esc(c.source||"imported")+'</div>';
+  const g=E.check==="correct"?((E.peeked||E.defHint)?"partial":"clean"):"missed";
+  const gt=g==="clean"?"Cracked it":g==="partial"?("Needed a nudge \u00b7 "+(E.peeked&&!E.defHint?"device peeked":E.defHint&&!E.peeked?"definition shown":"hint used")):"Missed it \u00b7 revealed";
+  const badge=$("#gradebadge");badge.className="badge "+g;badge.textContent=gt;
+  $("#preveal").hidden=true;$("#revealed").hidden=false;
 }
 function doCheck(){
   const inp=$("#panswer");const val=inp?inp.value:"";E.inputVal=val;if(!val.trim())return;
-  if(norm(val)===norm(E.current.answer)){E.check="correct";E.revealed=true;renderCard();}
+  if(norm(val)===norm(E.current.answer)){E.check="correct";E.revealed=true;showRevealed();}
   else{E.check="wrong";const m=$("#pmsg");if(m){m.textContent="\u2715 not quite \u2014 try again, or reveal";m.className="msg-inline bad";}if(inp){inp.classList.add("bad");inp.focus();}}
 }
-function doReveal(){E.revealed=true;if(E.check!=="correct")E.check="wrong";renderCard();}
-function doHint(){E.defHint=true;renderCard();}
-function doPeek(){E.peeked=true;renderCard();}
+function doReveal(){E.revealed=true;if(E.check!=="correct")E.check="wrong";showRevealed();}
+function doHint(){E.defHint=true;$("#cluetext").innerHTML=clueMarkup(E.current.clue,E.current.def||"",true);$("#hintbtn").style.display="none";const inp=$("#panswer");if(inp)inp.focus();}
+function doPeek(){E.peeked=true;const d=DEVICES[E.current.device];$("#devchipwrap").innerHTML='<span class="devchip">'+esc(d.name)+'</span><span class="devblurb">'+esc(d.blurb)+'</span>';const inp=$("#panswer");if(inp)inp.focus();}
 function nextCard(){
   const g=E.check==="correct"?((E.peeked||E.defHint)?"partial":"clean"):"missed";
   if(P.deck==="learn")recordLearn(E.current,g);else recordAssorted(E.current,g);
@@ -583,14 +619,18 @@ function pickInd(prev){
   const tot=list.reduce((s,x)=>s+w(x),0);let r=Math.random()*tot;
   for(const x of list){r-=w(x);if(r<=0)return x;}return list[list.length-1];
 }
+function drillFace(it){
+  const flip=(it.cat==="letter"||it.cat==="short"||it.cat==="sneaky");
+  return flip?{prompt:it.m,label:"What signals this?",answer:it.t}:{prompt:it.t,label:"What does this signal?",answer:it.m};
+}
 function renderIndDrill(){
   if(!I.dcur){I.dcur=pickInd(null);I.drev=false;}
-  const c=I.dcur;
-  $("#indbody").innerHTML='<div class="card"><div class="drill"><div class="lbl center">What does this signal?</div>'+
-    '<div class="drillterm">'+esc(c.t)+'</div>'+
-    (I.drev?'<div class="drillrev"><div class="indmean big">'+esc(c.m)+'</div>'+(c.n?'<div class="indnote">'+esc(c.n)+'</div>':"")+'</div>':"")+'</div>'+
-    (I.drev?'<div class="row gap2 pad" style="justify-content:stretch"><button class="btn btn-em" id="know" style="flex:1;justify-content:center">\u2713 Know it</button><button class="btn btn-am" id="learn" style="flex:1;justify-content:center">\u21bb Still learning</button></div>'
-           :'<div class="row center pad"><button class="btn btn-dark" id="drev">Reveal</button></div>')+'</div>'+
+  const c=I.dcur;const f=drillFace(c);
+  $("#indbody").innerHTML='<div class="card"><div class="drill"><div class="lbl center">'+f.label+'</div>'+
+    '<div class="drillterm">'+esc(f.prompt)+'</div>'+
+    (I.drev?'<div class="drillrev"><div class="drillans">'+esc(f.answer)+'</div><div class="indnote"><b>'+esc(c.t)+'</b> \u2014 '+esc(c.m)+(c.n?'. '+esc(c.n):"")+'</div></div>':"")+'</div>'+
+    (I.drev?'<div class="row gap2 pad" style="justify-content:stretch"><button class="btn btn-em big" id="know" style="flex:1;justify-content:center">\u2713 Know it</button><button class="btn btn-am big" id="learn" style="flex:1;justify-content:center">\u21bb Still learning</button></div>'
+           :'<div class="row center pad"><button class="btn btn-dark big" id="drev">Reveal</button></div>')+'</div>'+
     '<div class="muted sm center" style="margin-top:16px">Drilling '+(I.cat==="all"?"all signals":esc(IND_CATS[I.cat]))+'. \u201cStill learning\u201d returns more often.</div>';
   if(I.drev){$("#know").onclick=()=>markInd("known");$("#learn").onclick=()=>markInd("learning");}
   else $("#drev").onclick=()=>{I.drev=true;renderIndDrill();};
