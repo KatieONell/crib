@@ -157,6 +157,9 @@ header{margin-bottom:20px}
 #nextbar .badge{margin:0}
 #nextbar #nextbtn{margin-left:auto}
 .wrap{padding-bottom:96px}
+html,body{height:100%}
+body{position:fixed;inset:0;width:100%;overflow:hidden}
+.wrap{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
 </style>
 </head>
 <body>
@@ -520,7 +523,6 @@ function populateCard(){
   $("#hintbtn").style.display=loc?"":"none";
   $("#preveal").hidden=false;$("#revealed").hidden=true;$("#nextbar").hidden=true;
   updateFoot();
-  if(window.scrollY>4)window.scrollTo(0,0);
   refocus();
 }
 function showRevealed(){
