@@ -1,5 +1,5 @@
 /* CRIB offline cache */
-const C = 'crib-v2';
+const C = 'crib-v3';
 const ASSETS = ['./', './index.html'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
